@@ -407,18 +407,27 @@ describe Puppet::Network::AuthStore::Declaration do
 
   describe "when comparing patterns" do
     before :each do
-      @ip        = Puppet::Network::AuthStore::Declaration.new(:allow,'127.0.0.1')
-      @host_name = Puppet::Network::AuthStore::Declaration.new(:allow,'www.hard_knocks.edu')
-      @opaque    = Puppet::Network::AuthStore::Declaration.new(:allow,'hey_dude')
+      @ip     = Puppet::Network::AuthStore::Declaration.new(:allow_ip,'127.0.0.1')
+      @domain = Puppet::Network::AuthStore::Declaration.new(:allow,'www.example.com')
+      @opaque = Puppet::Network::AuthStore::Declaration.new(:allow,'a_name')
     end
-    it "should consider ip addresses before host names" do
-      (@ip < @host_name).should be_true
+    it "should be an ip Declaration" do
+      @ip.name.should be(:ip)
     end
-    it "should consider ip addresses before opaque strings" do
+    it "should be a domain Declaration" do
+      @domain.name.should be(:domain)
+    end
+    it "should be an opaque Declaration" do
+      @opaque.name.should be(:opaque)
+    end
+    it "should sort ip addresses before host names" do
+      (@ip < @domain).should be_true
+    end
+    it "should sort ip addresses before opaque strings" do
       (@ip < @opaque).should be_true
     end
-    it "should consider host_names before opaque strings" do
-      (@host_name < @opaque).should be_true
+    it "should sort host names before opaque strings" do
+      (@domain < @opaque).should be_true
     end
   end
 end
