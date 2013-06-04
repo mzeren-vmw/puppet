@@ -218,9 +218,11 @@ module Puppet
       # Does the name match our pattern?
       def matchname?(name)
         case @name
-          when :domain, :dynamic, :opaque
+          when :domain, :dynamic
             name = munge_name(name)
             (pattern == name) or (not exact? and pattern.zip(name).all? { |p,n| p == n })
+          when :opaque
+            pattern == name
           when :regex
             Regexp.new(pattern.slice(1..-2)).match(name)
         end
@@ -269,8 +271,8 @@ module Puppet
           [:domain,:inexact,host_sans_star.length,host_sans_star]
         when /\$\d+/                                              # a backreference pattern ala $1.reductivelabs.com or 192.168.0.$1 or $1.$2
           [:dynamic,:exact,nil,munge_name(value)]
-        when /^\w[-.@\w]*$/                                       # ? Just like a host name but allow '@'s and ending '.'s
-          [:opaque,:exact,nil,[value]]
+        when /^\w[-.@$\w]*$/                                      # e.g. allow kerberos principles, user@example.com, etc.
+          [:opaque,:exact,nil,value]
         when /^\/.*\/$/                                           # a regular expression
           [:regex,:inexact,nil,value]
         else
