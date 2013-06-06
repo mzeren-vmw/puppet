@@ -82,6 +82,13 @@ module Puppet
     end
 
     def interpolate(match)
+      # TODO: using thread local storage smells like a hack used to avoid
+      # plumbing around an extra request-specific value. Using thread local
+      # storage for security critical information could result in a bug if
+      # thread local storage leaks from one request to another. Instead
+      # interpolate should return a new authstore instance or a new type that
+      # represents an "interpolated" or "resolved" authstore and we should pass
+      # that around as necessary.
       Thread.current[:declarations] = @declarations.collect { |ace| ace.interpolate(match) }.sort
     end
 
@@ -103,6 +110,10 @@ module Puppet
     # converts the pattern and sticks it into the hash.
     def store(type, pattern)
       @declarations << Declaration.new(type, pattern)
+      # TODO it is unnecessary and arguably incorrect to call sort here. For
+      # example there's no well defined sort order for :dynamic declrations.
+      # They must be interpolated before they can be sorted. Sorting should
+      # probably be done just after interpolation during matching.
       @declarations.sort!
 
       nil
@@ -119,7 +130,7 @@ module Puppet
       attr_reader :type
       VALID_TYPES = [ :allow, :deny, :allow_ip, :deny_ip ]
 
-      attr_accessor :name
+      attr_reader :name
 
       # The pattern we're matching against.  Can be an IPAddr instance,
       # or an array of strings, resulting from reversing a hostname
@@ -127,7 +138,7 @@ module Puppet
       attr_reader :pattern
 
       # The length.  Only used for iprange and domain.
-      attr_accessor :length
+      attr_reader :length
 
       # Sort the declarations most specific first.
       def <=>(other)
@@ -148,7 +159,13 @@ module Puppet
 
       def initialize(type, pattern)
         self.type = type
-        self.pattern = pattern
+        if [:allow_ip, :deny_ip].include?(self.type)
+          parse_ip(pattern)
+        else
+          parse(pattern)
+        end
+        @orig = pattern
+        self.freeze
       end
 
       # Are we an IP type?
@@ -165,15 +182,21 @@ module Puppet
         end
       end
 
-      # Set the pattern appropriately.  Also sets the name and length.
-      def pattern=(pattern)
-        if [:allow_ip, :deny_ip].include?(self.type)
-          parse_ip(pattern)
-        else
-          parse(pattern)
-        end
-        @orig = pattern
-      end
+      # TODO: This setter does too much. It's more like "re-construct". It is
+      # only called in initialize and interpolate. Instead of providing a setter
+      # we should just use new directly in interpolate. That is the correct
+      # meaning for interpolate anyway : "if the type is x and the pattern is y
+      # what is my new decl (if any)".
+      #
+      # # Set the pattern appropriately.  Also sets the name and length.
+      # def pattern=(pattern)
+      #   if [:allow_ip, :deny_ip].include?(self.type)
+      #     parse_ip(pattern)
+      #   else
+      #     parse(pattern)
+      #   end
+      #   @orig = pattern
+      # end
 
       # Mapping a type of statement into a return value.
       def result
@@ -197,20 +220,19 @@ module Puppet
       # and we're called with a MatchData whose capture 1 is puppet
       # we'll return a pattern of puppet.reductivelabs.com
       def interpolate(match)
-        clone = dup
-        if @name == :dynamic
-          clone.pattern = clone.pattern.reverse.collect do |p|
+        return self unless @name == :dynamic
+        interpolated = @pattern.reverse.collect do |p|
             p.gsub(/\$(\d)/) { |m| match[$1.to_i] }
           end.join(".")
-        end
-        clone
+        self.class.new(@type, interpolated)
+        # TODO: throw if nil? (no) throw if :dynamic? (yes)
       end
-
       private
 
       # Returns nil if both values are true or both are false, returns
       # -1 if the first is true, and 1 if the second is true.  Used
       # in the <=> operator.
+      # TODO: this is not really "compare". A better name might be "partial_compare"
       def compare(me, them)
         (me and them) ? nil : me ? -1 : them ? 1 : nil
       end
@@ -262,6 +284,32 @@ module Puppet
       def parse(value)
         @name,@exact,@length,@pattern = *case value
         when /^(\w[-\w]*\.)+[-\w]+$/                              # a full hostname
+
+          # TODO: the regex above allows unexpected names like "a-.-".
+          #
+          # Looking at the URI RFC host definition reveals some other possible
+          # issues. See: http://tools.ietf.org/html/rfc3986#section-3.2.2.
+          #
+          # ... The most common name registry mechanism is the Domain Name
+          # System ...
+          #
+          # ... Such a name consists of a sequence of domain labels separated by
+          # ".", each domain label starting and ending with an alphanumeric
+          # character and possibly also containing "-" characters. ...
+          #
+          # ... The rightmost domain label of a fully qualified domain name in
+          # DNS may be followed by a single "." and should be if it is necessary
+          # to distinguish between the complete domain name and some local
+          # domain. ...
+          #
+          # ... URI producers should use names that conform to the DNS syntax, even
+          # when use of DNS is not immediately apparent, and should limit these
+          # names to no more than 255 characters in length. ...
+          #
+          # ... The reg-name syntax allows percent-encoded octets in order to
+          # represent non-ASCII registered names ... [although maybe we just say
+          # auth.conf must be UTF-8 encoded?]
+
           # Change to /^(\w[-\w]*\.)+[-\w]+\.?$/ for FQDN support
           [:domain,:exact,nil,munge_name(value)]
         when /^\*(\.(\w[-\w]*)){1,}$/                             # *.domain.com
