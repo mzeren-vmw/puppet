@@ -405,20 +405,107 @@ describe Puppet::Network::AuthStore::Declaration do
     end
   end
 
-  describe "when comparing patterns" do
-    before :each do
-      @ip        = Puppet::Network::AuthStore::Declaration.new(:allow,'127.0.0.1')
-      @host_name = Puppet::Network::AuthStore::Declaration.new(:allow,'www.hard_knocks.edu')
-      @opaque    = Puppet::Network::AuthStore::Declaration.new(:allow,'hey_dude')
+  class DeclTestCase
+    attr_reader :rank, :type, :pattern, :name, :exact, :length, :pending
+    attr_reader :decl
+    def initialize attributes
+      @rank, @type, @pattern, @name, @exact, @length, @pending = *attributes
+      @decl = Puppet::Network::AuthStore::Declaration.new(@type, @pattern)
     end
-    it "should consider ip addresses before host names" do
-      (@ip < @host_name).should be_true
+    def inspect
+      "#{Hash[instance_variables.map { |var| [var[1..-1].to_sym, instance_variable_get(var)] }]}"
     end
-    it "should consider ip addresses before opaque strings" do
-      (@ip < @opaque).should be_true
-    end
-    it "should consider host_names before opaque strings" do
-      (@host_name < @opaque).should be_true
+    def to_s
+      "{#{@decl} #{@exact} #{@length.nil? ? "nil" : @length}}"
     end
   end
+
+  # Test data for Declaration comparison testing. Parsing is also sanity checked
+  # for clarity, but this is not the right place to add more parsing tests.
+  #
+  # Note: comparison of un-interpolated :dynamic declarations is not well
+  # defined so :dynamic is not included in this data set.
+
+  equiv_classes = [
+    #  input      input              expect    expect   expect
+    #  type       pattern            name      exact    length  pending
+    #  ip
+    [
+      [:deny_ip,  '127.0.0.1',       :ip,      :exact,     nil, ":deny_ip does not sort before :ip, see deny? impl"],
+    ],
+    [
+      [:allow_ip, '127.0.0.1',       :ip,      :exact,     nil, nil],
+    ],
+    [
+      [:deny,     'www.example.com', :domain,  :exact,     nil, nil],
+      [:deny,     'WWW.EXAMPLE.COM', :domain,  :exact,     nil, nil],
+    ],
+    [
+      [:allow,    'www.example.com', :domain,  :exact,     nil, nil],
+      [:allow,    'WWW.EXAMPLE.COM', :domain,  :exact,     nil, nil],
+    ],
+    [
+      # Note: 'a_name' sorts before 'com' from the :domain :exact example above
+      [:allow,    'a_name',          :opaque,  :exact,     nil, ":opaque sorting relative to :domain not well defined"],
+    ],
+    [
+      [:allow_ip, '127.0.0.1/24',    :ip,      :inexact,    24, nil],
+      [:allow_ip, '127.0.0.*',       :ip,      :inexact,    24, nil],
+    ],
+    [
+      [:deny_ip,  '127.0.0.1/16',    :ip,      :inexact,    16, ":deny_ip does not sort before :ip, see deny? impl"],
+      [:deny_ip,  '127.0.*',         :ip,      :inexact,    16, ":deny_ip does not sort before :ip, see deny? impl"],
+    ],
+    [
+      [:allow_ip, '127.0.0.1/16',    :ip,      :inexact,    16, nil],
+      [:allow_ip, '127.0.*',         :ip,      :inexact,    16, nil],
+    ],
+    [
+      [:allow,    '*.example.com',   :domain,  :inexact,     2, nil],
+    ],
+    [
+      [:deny,     '*.com',           :domain,  :inexact,     1, nil],
+    ],
+    [
+      [:allow,    '*.com',           :domain,  :inexact,     1, nil],
+    ],
+    [
+      [:deny,     '/example/',       :regex,   :inexact,   nil, ":regex nil length can cause <=> to fail."],
+    ],
+    [
+      [:allow,    '/example/',       :regex,   :inexact,   nil, ":regex nil length can cause <=> to fail."],
+    ],
+  ]
+
+  # unshift ranks in place
+  equiv_classes.zip *[0...equiv_classes.count] do |cls,rank|
+    cls.each { |e| e.unshift rank }
+  end
+
+  equiv_classes.freeze
+
+  # flatten and construct cases
+  cases = equiv_classes.flatten(1).collect do |c| DeclTestCase.new(c) end.freeze
+
+  describe "when parsing" do
+    cases.each do |c|
+      specify "#{c.type}, '#{c.pattern}' should be #{c.name}, #{c.exact}, with length #{c.length}" do
+        pending c.pending unless not c.pending
+        c.decl.name.should be(c.name)
+        c.decl.exact?.should be(c.exact == :exact)
+        c.decl.length.should be(c.length)
+      end
+    end
+  end
+
+  describe "when comparing" do
+    cases.combination(2) do |lhs,rhs|
+      specify "#{lhs} <=> #{rhs} should be #{lhs.rank <=> rhs.rank}" do
+        pending lhs.pending unless not lhs.pending
+        pending rhs.pending unless not rhs.pending
+        (lhs.decl <=> rhs.decl).should be(lhs.rank <=> rhs.rank)
+      end
+    end
+  end
+
 end
