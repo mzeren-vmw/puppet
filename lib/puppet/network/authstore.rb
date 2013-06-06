@@ -135,7 +135,8 @@ module Puppet
         compare(ip?, other.ip?)  ||
         ((length != other.length) &&  (other.length <=> length)) ||
         compare(deny?, other.deny?) ||
-        ( ip? ? pattern.to_s <=> other.pattern.to_s : pattern <=> other.pattern)
+        compare(name == :domain, other.name == :domain) ||
+        (ip? ? pattern.to_s <=> other.pattern.to_s : pattern <=> other.pattern)
       end
 
       def deny?
@@ -218,9 +219,11 @@ module Puppet
       # Does the name match our pattern?
       def matchname?(name)
         case @name
-          when :domain, :dynamic, :opaque
+          when :domain, :dynamic
             name = munge_name(name)
             (pattern == name) or (not exact? and pattern.zip(name).all? { |p,n| p == n })
+          when :opaque
+            pattern == name
           when :regex
             Regexp.new(pattern.slice(1..-2)).match(name)
         end
@@ -270,7 +273,7 @@ module Puppet
         when /\$\d+/                                              # a backreference pattern ala $1.reductivelabs.com or 192.168.0.$1 or $1.$2
           [:dynamic,:exact,nil,munge_name(value)]
         when /^\w[-.@\w]*$/                                       # ? Just like a host name but allow '@'s and ending '.'s
-          [:opaque,:exact,nil,[value]]
+          [:opaque,:exact,nil,value]
         when /^\/.*\/$/                                           # a regular expression
           [:regex,:inexact,nil,value]
         else
