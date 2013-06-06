@@ -14,6 +14,7 @@ class Rights
   end
 
   def is_request_forbidden_and_why?(indirection, method, key, params)
+    Puppet.warning "is_request_forbidden_and_why? indirection:#{indirection}, method:#{method}, key:#{key}, params:#{params}"
     methods_to_check = if method == :head
                          # :head is ok if either :find or :save is ok.
                          [:find, :save]

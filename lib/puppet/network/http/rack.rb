@@ -5,6 +5,8 @@ require 'rack/response'
 require 'puppet/network/http'
 require 'puppet/network/http/rack/rest'
 
+require 'json'
+
 # An rack application, for running the Puppet HTTP Server.
 class Puppet::Network::HTTP::Rack
   # The real rack application (which needs to respond to call).
@@ -16,6 +18,7 @@ class Puppet::Network::HTTP::Rack
     request = Rack::Request.new(env)
     response = Rack::Response.new
     Puppet.debug 'Handling request: %s %s' % [request.request_method, request.fullpath]
+    Puppet.debug "Env:\n#{JSON.pretty_generate(env)}"
 
     begin
       Puppet::Network::HTTP::RackREST.new.process(request, response)

@@ -61,6 +61,7 @@ module Puppet
     # raise an Puppet::Network::AuthorizedError if the request
     # is denied.
     def check_authorization(indirection, method, key, params)
+      Puppet.warning "check_authorization_rights:#{rights}"
       if authorization_failure_exception = @rights.is_request_forbidden_and_why?(indirection, method, key, params)
         Puppet.warning("Denying access: #{authorization_failure_exception}")
         raise authorization_failure_exception
@@ -68,6 +69,8 @@ module Puppet
     end
 
     def initialize(rights=nil)
+      Puppet.warning "rights:#{rights}"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
       @rights = rights || Puppet::Network::Rights.new
       insert_default_acl
     end

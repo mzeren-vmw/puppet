@@ -88,6 +88,7 @@ class Puppet::Network::HTTP::RackREST < Puppet::Network::HTTP::RackHttpHandler
   end
 
   def client_cert(request)
+    Puppet.warning "client_cert CALLER:#{JSON.pretty_generate(caller)}"
     # This environment variable is set by mod_ssl, note that it
     # requires the `+ExportCertData` option in the `SSLOptions` directive
     cert = request.env['SSL_CLIENT_CERT']

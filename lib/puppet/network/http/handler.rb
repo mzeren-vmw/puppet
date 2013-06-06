@@ -83,6 +83,7 @@ module Puppet::Network::HTTP::Handler
       indirection, method, key, params = uri2indirection(request_method, request_path, request_params)
 
       check_authorization(indirection, method, key, params)
+      Puppet.warning "passed check_authorization"
       warn_if_near_expiration(client_cert(request))
 
       send("do_#{method}", indirection, key, params, request, response)
@@ -90,6 +91,8 @@ module Puppet::Network::HTTP::Handler
   rescue SystemExit,NoMemoryError
     raise
   rescue Exception => e
+    Puppet.warning "Exception:#{e}"
+    Puppet.warning "Exception:#{JSON.pretty_generate(e.backtrace)}"
     return do_exception(response, e)
   ensure
     cleanup(request)

@@ -3,6 +3,7 @@
 
 require 'ipaddr'
 require 'puppet/util/logging'
+require 'json'
 
 module Puppet
   class AuthStoreError < Puppet::Error; end
@@ -15,6 +16,10 @@ module Puppet
     # is non-nil, then both inputs must be provided.  If neither input
     # is provided, then the authstore is considered local and defaults to "true".
     def allowed?(name, ip)
+      Puppet.warning "name:#{name}, ip:#{ip}"
+      Puppet.warning "declarations:#{declarations}"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
+
       if name or ip
         # This is probably unnecessary, and can cause some weirdnesses in
         # cases where we're operating over localhost but don't have a real
@@ -29,6 +34,7 @@ module Puppet
       # yay insecure overrides
       return true if globalallow?
 
+      Puppet.warning "declarations:#{declarations}"
       if decl = declarations.find { |d| d.match?(name, ip) }
         return decl.result
       end
@@ -82,7 +88,11 @@ module Puppet
     end
 
     def interpolate(match)
+      Puppet.warning "interpolate(#{match})"
+      Puppet.warning "declarations:#{declarations}"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
       Thread.current[:declarations] = @declarations.collect { |ace| ace.interpolate(match) }.sort
+      Puppet.warning "after declarations:#{declarations}"
     end
 
     def reset_interpolation
@@ -102,6 +112,8 @@ module Puppet
     # Store the results of a pattern into our hash.  Basically just
     # converts the pattern and sticks it into the hash.
     def store(type, pattern)
+      Puppet.warning "type:#{type}, pattern:#{pattern}"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
       @declarations << Declaration.new(type, pattern)
       @declarations.sort!
 
@@ -159,6 +171,7 @@ module Puppet
 
       # Does this declaration match the name/ip combo?
       def match?(name, ip)
+        Puppet.warning "match?(#{name}, #{ip})"
         if ip?
           pattern.include?(IPAddr.new(ip))
         else
@@ -218,6 +231,8 @@ module Puppet
 
       # Does the name match our pattern?
       def matchname?(name)
+        puts "name_param:#{JSON.pretty_generate([name])}"
+
         case @name
           when :domain, :dynamic
             name = munge_name(name)
