@@ -368,48 +368,89 @@ describe Puppet::Network::AuthStore::Declaration do
     end
   end
 
+  [
+    "host",
+    "host@example.com",
+    "host@EXAMPLE.COM",
+  ].each { |opaque|
+    describe "when the pattern is opaque such as #{opaque}" do
+      before :each do
+        @declaration = Puppet::Network::AuthStore::Declaration.new(:allow,opaque)
+      end
+      it "should parse as :opaque" do
+        @declaration.name.should be(:opaque)
+      end
+      it "should match the host" do
+        @declaration.should be_match(opaque,'127.0.0.1')
+      end
+      it "should not match other host" do
+        @declaration.should_not be_match('unmachable','127.0.0.1')
+      end
+    end
+  }
 
-  describe "when the pattern is an opaque string with a back reference" do
+  describe "when the pattern contains a back reference and the matched data is :opaque" do
     before :each do
       @host = 'c216f41a-f902-4bfb-a222-850dd957bebb'
       @item = "/catalog/#{@host}"
       @pattern = %{^/catalog/([^/]+)$}
       @declaration = Puppet::Network::AuthStore::Declaration.new(:allow,'$1')
+      @interpolated = @declaration.interpolate(@item.match(@pattern))
     end
-    it "should match an IP with the appropriate interpolation" do
-      @declaration.interpolate(@item.match(@pattern)).should be_match(@host,'10.0.0.5')
+    it "should be an opaque Declaration" do
+      @interpolated.name.should be(:opaque)
+    end
+    it "should match the host" do
+      @interpolated.should be_match(@host,'10.0.0.5')
     end
   end
 
-  describe "when the pattern is an opaque string with a back reference and the matched data contains dots" do
+  describe "when the pattern contains a back reference and the matched data is :domain" do
     before :each do
       @host = 'admin.mgmt.nym1'
       @item = "/catalog/#{@host}"
       @pattern = %{^/catalog/([^/]+)$}
       @declaration = Puppet::Network::AuthStore::Declaration.new(:allow,'$1')
+      @interpolated = @declaration.interpolate(@item.match(@pattern))
     end
-    it "should match a name with the appropriate interpolation" do
-      @declaration.interpolate(@item.match(@pattern)).should be_match(@host,'10.0.0.5')
+    it "should be a :domain Declaration" do
+      @interpolated.name.should be(:domain)
+    end
+    it "should match the host" do
+      @interpolated.should be_match(@host,'10.0.0.5')
     end
   end
 
-  describe "when the pattern is an opaque string with a back reference and the matched data contains dots with an initial prefix that looks like an IP address" do
+  describe "when the pattern contains a back reference and the matched data is :domain with leading digits" do
     before :each do
       @host = '01.admin.mgmt.nym1'
       @item = "/catalog/#{@host}"
       @pattern = %{^/catalog/([^/]+)$}
       @declaration = Puppet::Network::AuthStore::Declaration.new(:allow,'$1')
+      @interpolated = @declaration.interpolate(@item.match(@pattern))
     end
-    it "should match a name with the appropriate interpolation" do
-      @declaration.interpolate(@item.match(@pattern)).should be_match(@host,'10.0.0.5')
+    it "should be a :domain Declaration" do
+      @interpolated.name.should be(:domain)
+    end
+    it "should match the host" do
+      @interpolated.should be_match(@host,'10.0.0.5')
     end
   end
 
   describe "when comparing patterns" do
     before :each do
-      @ip        = Puppet::Network::AuthStore::Declaration.new(:allow,'127.0.0.1')
+      @ip        = Puppet::Network::AuthStore::Declaration.new(:allow_ip,'127.0.0.1')
       @host_name = Puppet::Network::AuthStore::Declaration.new(:allow,'www.hard_knocks.edu')
-      @opaque    = Puppet::Network::AuthStore::Declaration.new(:allow,'hey_dude')
+      @opaque    = Puppet::Network::AuthStore::Declaration.new(:allow,'a_dude')
+    end
+    it "ip" do
+      @ip.name.should be(:ip)
+    end
+    it "host" do
+      @host_name.name.should be(:domain)
+    end
+    it "opaque" do
+      @opaque.name.should be(:opaque)
     end
     it "should consider ip addresses before host names" do
       (@ip < @host_name).should be_true
