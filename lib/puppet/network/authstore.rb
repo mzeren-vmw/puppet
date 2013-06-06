@@ -273,6 +273,9 @@ module Puppet
           bits = 8*segments.length
           [:inexact, bits, IPAddr.new((segments+[0,0,0])[0,4].join(".") + "/#{bits}")]
         else
+          # TODO: do we really want to report "invalid pattern" back to the
+          # user? for security resonse shouldn't this just generate a normal
+          # 401?
           raise AuthStoreError, "Invalid IP pattern #{value}"
         end
       end
@@ -292,6 +295,9 @@ module Puppet
         when /^\/.*\/$/                                           # a regular expression
           [:regex,:inexact,nil,value]
         else
+          # TODO: do we really want to report "invalid pattern" back to the
+          # user? for security resonse shouldn't this just generate a normal
+          # 401?
           raise AuthStoreError, "Invalid pattern #{value}"
         end
       end
