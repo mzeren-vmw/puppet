@@ -235,11 +235,13 @@ module Puppet
       # we'll return a pattern of puppet.reductivelabs.com
       def interpolate(match)
         return self unless @name == :dynamic
-        interpolated = @pattern.reverse.collect do |p|
-            p.gsub(/\$(\d)/) { |m| match[$1.to_i] }
-          end.join(".")
-        self.class.new(@type, interpolated)
+        Puppet.warning "interpolate before #{@pattern}"
+        interpolated = @pattern.gsub(/\$(\d)/) { |m| match[$1.to_i] }
+        Puppet.warning "interpolate after #{interpolated}"
+        result = self.class.new(@type, interpolated)
         # TODO: throw if nil? (no) throw if :dynamic? (yes)
+        raise ArgumentError, "(not correct exception type) interpolate resulted in :dynamic declaration:#{self}" if result.name == :dynamic
+        result
       end
       private
 
@@ -256,13 +258,15 @@ module Puppet
         puts "name_param:#{JSON.pretty_generate([name])}"
 
         case @name
-          when :domain, :dynamic
+          when :domain
             name = munge_name(name)
             (pattern == name) or (not exact? and pattern.zip(name).all? { |p,n| p == n })
           when :opaque
             pattern == name
           when :regex
             Regexp.new(pattern.slice(1..-2)).match(name)
+          when :dynamic
+            raise ArgumentError, "trying to match :dynamic declaration:#{self}"
         end
       end
 
@@ -337,7 +341,7 @@ module Puppet
           host_sans_star = munge_name(value)[0..-2]
           [:domain,:inexact,host_sans_star.length,host_sans_star]
         when /\$\d+/                                              # a backreference pattern ala $1.reductivelabs.com or 192.168.0.$1 or $1.$2
-          [:dynamic,:exact,nil,munge_name(value)]
+          [:dynamic,:exact,nil,value]
         when /^\w[-.@$\w]*$/                                       # ? Just like a host name but allow '@'s and ending '.'s
           [:opaque,:exact,nil,value]
         when /^\/.*\/$/                                           # a regular expression
