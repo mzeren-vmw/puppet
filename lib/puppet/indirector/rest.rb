@@ -79,6 +79,10 @@ class Puppet::Indirector::REST < Puppet::Indirector::Terminus
   end
 
   def http_request(method, request, *args)
+    Puppet.warning "method:#{method}"
+    Puppet.warning "request:#{request}"
+    Puppet.warning "args:#{args}"
+    Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
     conn = network(request)
     conn.send(method, *args)
   end

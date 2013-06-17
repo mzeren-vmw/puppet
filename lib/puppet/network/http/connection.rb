@@ -4,6 +4,10 @@ require 'puppet/ssl/configuration'
 require 'puppet/ssl/validator'
 require 'puppet/network/authentication'
 
+# TODO: lazy load, do not require gssapi, ffi
+require 'gssapi'
+require 'base64'
+
 module Puppet::Network::HTTP
 
   # This class provides simple methods for issuing various types of HTTP
@@ -48,7 +52,21 @@ module Puppet::Network::HTTP
       ssl_validator = Puppet::SSL::Validator.new(:ssl_configuration => ssl_configuration)
       # Perform our own validation of the SSL connection in addition to OpenSSL
       ssl_validator.register_verify_callback(connection)
+
+      Puppet.warning "send: #{method} #{args}"
+      # gss = GSSAPI::Simple.new 'puppet1.spacex.corp', 'host/puppet1.spacex.corp@SPACEX.CORP'
+      # token = gss.init_context
+      # # puts "token: #{token}"
+      # b64token = Base64.strict_encode64(token) + '='
+      # args[1]['Authorization'] = 'Negotiate ' + b64token
+
       response = connection.send(method, *args)
+
+      # b64rtoken = response['www-authenticate'][('negotiate '.length)..-1]
+      # rtoken = Base64.decode64 b64rtoken
+      # token = gss.init_context rtoken
+      # puts "server token: #{token}"
+
       # Check the peer certs and warn if they're nearing expiration.
       warn_if_near_expiration(*ssl_validator.peer_certs)
 
