@@ -42,6 +42,7 @@ class Puppet::Agent
         with_client do |client|
           begin
             client_args = client_options.merge(:pluginsync => Puppet[:pluginsync])
+            Puppet.warning "client_args:#{JSON.pretty_generate(client_args)}"
             sync.synchronize { lock { client.run(client_args) } }
           rescue SystemExit,NoMemoryError
             raise

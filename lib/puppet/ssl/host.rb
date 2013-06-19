@@ -5,6 +5,8 @@ require 'puppet/ssl/certificate'
 require 'puppet/ssl/certificate_request'
 require 'puppet/ssl/certificate_revocation_list'
 
+require 'json'
+
 # The class that manages all aspects of our SSL certificates --
 # private keys, public keys, requests, etc.
 class Puppet::SSL::Host
@@ -186,6 +188,11 @@ DOC
   end
 
   def certificate
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      Puppet.warning "agent_no_cert: returning fake host state 'signed'"
+      return nil
+    end
+
     unless @certificate
       generate_key unless key
 
@@ -218,6 +225,12 @@ ERROR_STRING
 
   # Generate all necessary parts of our ssl host.
   def generate
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      Puppet.warning "agent_no_cert: skipping Host.generate"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
+      return
+    end
+
     generate_key unless key
     generate_certificate_request unless certificate_request
 
@@ -309,6 +322,11 @@ ERROR_STRING
 
   # Attempt to retrieve a cert, if we don't already have one.
   def wait_for_cert(time)
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      Puppet.warning "agent_no_cert: returning fake host state 'signed'"
+      return
+    end
+
     begin
       return if certificate
       generate
@@ -343,6 +361,11 @@ ERROR_STRING
   end
 
   def state
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      Puppet.warning "agent_no_cert: returning fake host state 'signed'"
+      return 'signed'
+    end
+
     if certificate_request
       return 'requested'
     end

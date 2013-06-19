@@ -448,6 +448,11 @@ class Puppet::SSL::CertificateAuthority
   #
   # @return [Boolean] true if signed, there are no cases where false is returned
   def verify(name)
+    # if Puppet[:agent_without_cert] # TODO: KERB HACK
+    #   Puppet.warning "agent_without_cert: CertificateAuthority.verify(#{name}): returning true"
+    #   return true
+    # end
+
     unless cert = Puppet::SSL::Certificate.indirection.find(name)
       raise ArgumentError, "Could not find a certificate for #{name}"
     end

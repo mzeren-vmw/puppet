@@ -49,23 +49,39 @@ module Puppet::Network::HTTP
     end
 
     def request(method, *args)
+      Puppet.warning "request: #{@host}:#{port} #{method} #{args}"
+
       ssl_validator = Puppet::SSL::Validator.new(:ssl_configuration => ssl_configuration)
       # Perform our own validation of the SSL connection in addition to OpenSSL
       ssl_validator.register_verify_callback(connection)
 
-      Puppet.warning "send: #{method} #{args}"
-      # gss = GSSAPI::Simple.new 'puppet1.spacex.corp', 'host/puppet1.spacex.corp@SPACEX.CORP'
-      # token = gss.init_context
-      # # puts "token: #{token}"
-      # b64token = Base64.strict_encode64(token) + '='
-      # args[1]['Authorization'] = 'Negotiate ' + b64token
+      # Puppet.warning "send: #{@host}:#{port} #{method} #{args}"
+      spnego = Puppet[:gss_spnego]
+      Puppet.warning "spnego: #{spnego}"
+
+      # TODO: KERB need to iterate until complete
+      gss = nil
+      if spnego
+        gss = GSSAPI::Simple.new @host, 'HTTP'
+        token = gss.init_context
+        b64token = Base64.strict_encode64(token)
+        Puppet.warning "b64token: #{b64token}"
+        args[-1]['Authorization'] = 'Negotiate ' + b64token
+      end
 
       response = connection.send(method, *args)
 
-      # b64rtoken = response['www-authenticate'][('negotiate '.length)..-1]
-      # rtoken = Base64.decode64 b64rtoken
-      # token = gss.init_context rtoken
-      # puts "server token: #{token}"
+      Puppet.warning response.inspect
+      Puppet.warning response.to_hash.inspect
+      Puppet.warning response.body
+
+      if spnego
+        # TODO: KERB check for null token, decode failure etc.
+        b64rtoken = response['www-authenticate'][('negotiate '.length)..-1]
+        rtoken = Base64.decode64 b64rtoken
+        token = gss.init_context rtoken
+        Puppet.warning "token: #{token}"
+      end
 
       # Check the peer certs and warn if they're nearing expiration.
       warn_if_near_expiration(*ssl_validator.peer_certs)
@@ -155,12 +171,19 @@ module Puppet::Network::HTTP
 
     # Use cert information from a Puppet client to set up the http object.
     def cert_setup
+      Puppet.warning "FileTest.exist?(Puppet[:hostcert]: #{FileTest.exist?(Puppet[:hostcert])}"
+      Puppet.warning "FileTest.exist?(ssl_configuration.ca_auth_file): #{FileTest.exist?(ssl_configuration.ca_auth_file)}"
+      Puppet.warning "ssl_host.ssl_store: #{ssl_host.ssl_store}"
       if FileTest.exist?(Puppet[:hostcert]) and FileTest.exist?(ssl_configuration.ca_auth_file)
         @connection.cert_store  = ssl_host.ssl_store
         @connection.ca_file     = ssl_configuration.ca_auth_file
         @connection.cert        = ssl_host.certificate.content
         @connection.verify_mode = OpenSSL::SSL::VERIFY_PEER
         @connection.key         = ssl_host.key.content
+      elsif FileTest.exist?(ssl_configuration.ca_auth_file)
+        @connection.cert_store  = ssl_host.ssl_store
+        @connection.ca_file     = ssl_configuration.ca_auth_file
+        @connection.verify_mode = OpenSSL::SSL::VERIFY_PEER
       else
         # We don't have the local certificates, so we don't do any verification
         # or setup at this early stage.  REVISIT: Shouldn't we supply the local

@@ -723,6 +723,22 @@ EOT
     }
   )
 
+  # TODO: KERB complete settings etc.
+  # * complete descriptions
+  # TODO: KERB make enum? never, on_401, always ?
+  define_settings(:main, # :gss?
+    :gss_spnego => {
+      :type => :boolean,
+      :default => false,
+      :desc => "Use GSS API to authenticate HTTP requests via SPNEGO",
+    },
+    :agent_without_cert => {
+      :type => :boolean,
+      :default => false,
+      :desc => "do not create / use agent certs",
+    },
+  )
+
   # Define the config default.
 
     define_settings(:application,

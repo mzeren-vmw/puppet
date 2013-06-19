@@ -79,12 +79,17 @@ class Puppet::Indirector::REST < Puppet::Indirector::Terminus
   end
 
   def http_request(method, request, *args)
-    Puppet.warning "method:#{method}"
-    Puppet.warning "request:#{request}"
-    Puppet.warning "args:#{args}"
-    Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
-    conn = network(request)
-    conn.send(method, *args)
+    begin
+      Puppet.warning "method:#{method}"
+      Puppet.warning "request:#{request}"
+      Puppet.warning "args:#{args}"
+      Puppet.warning "CALLER:#{JSON.pretty_generate(caller)}"
+      conn = network(request)
+      conn.send(method, *args)
+    rescue => detail
+      Puppet.warning "exception: #{detail} \n#{detail.backtrace}"
+      raise
+    end
   end
 
   def find(request)

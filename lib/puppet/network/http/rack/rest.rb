@@ -117,11 +117,12 @@ class Puppet::Network::HTTP::RackREST < Puppet::Network::HTTP::RackHttpHandler
     cn = Puppet::Util::SSL.cn_from_subject(subject)
     verified = request.env[Puppet[:ssl_client_verify_header]] == 'SUCCESS'
     remote_user = request.env["REMOTE_USER"]
-    if cn && verified
-      result[:node] = cn
-      result[:authenticated] = true
+    if false
     elsif remote_user
       result[:node] = remote_user
+      result[:authenticated] = true
+    elsif cn && verified
+      result[:node] = cn
       result[:authenticated] = true
     else
       result[:node] = resolve_node(result)

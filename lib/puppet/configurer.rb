@@ -141,6 +141,7 @@ class Puppet::Configurer
       end
 
       begin
+        Puppet.warning "environment #{@environment}"
         if node = Puppet::Node.indirection.find(Puppet[:node_name_value],
             :environment => @environment, :ignore_cache => true)
           if node.environment.to_s != @environment
@@ -152,6 +153,7 @@ class Puppet::Configurer
       rescue Puppet::Error, Net::HTTPError => detail
         Puppet.warning("Unable to fetch my node definition, but the agent run will continue:")
         Puppet.warning(detail)
+        Puppet.warning "CALLER:#{JSON.pretty_generate(detail.backtrace)}"
       end
 
       fact_options = get_facts(options) unless fact_options
@@ -179,8 +181,9 @@ class Puppet::Configurer
       apply_catalog(catalog, options)
       report.exit_status
     rescue => detail
+      Puppet.warning "backtrace:\n#{JSON.pretty_generate(detail)}"
       Puppet.log_exception(detail, "Failed to apply catalog: #{detail}")
-      return nil
+     return nil
     ensure
       execute_postrun_command or return nil
     end
@@ -247,6 +250,7 @@ class Puppet::Configurer
     raise
   rescue Exception => detail
     Puppet.log_exception(detail, "Could not retrieve catalog from remote server: #{detail}")
+    Puppet.warning "\n#{JSON.pretty_generate(detail.backtrace)}"
     return nil
   end
 end

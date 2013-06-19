@@ -75,6 +75,7 @@ Puppet::Indirector::Face.define(:catalog, '0.0.1') do
           catalog.apply(:report => report)
         end
       rescue => detail
+        Puppet.warning "backtrace:\n#{JSON.pretty_generate(detail)}"
         Puppet.log_exception(detail, "Failed to apply catalog: #{detail}")
       end
 
