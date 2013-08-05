@@ -3,6 +3,7 @@ require 'puppet/ssl/host'
 require 'puppet/ssl/configuration'
 require 'puppet/ssl/validator'
 require 'puppet/network/authentication'
+require 'base64'
 require 'uri'
 
 module Puppet::Network::HTTP
@@ -132,7 +133,35 @@ module Puppet::Network::HTTP
       # Perform our own validation of the SSL connection in addition to OpenSSL
       ssl_validator.register_verify_callback(connection)
 
+      spnego = Puppet[:agent_spnego_gss]
+
+      if spnego
+        begin
+          require 'gssapi'
+          # Traditionally in SPNEGO the Authorization header is added only after
+          # a 401 response, however in the puppet workflow we expect all
+          # requests to require authentication so we can save a rountrip by
+          # egarly adding the header.
+          gss = GSSAPI::Simple.new @host, 'HTTP'
+          token = gss.init_context
+          b64token = Base64.strict_encode64(token)
+          args[-1]['Authorization'] = 'Negotiate ' + b64token
+        rescue LoadError => e
+          Puppet.log_and_raise(e, "agent_spnego_gss true, but gssapi not found: #{e}")
+        end
+      end
+
       response = connection.send(method, *args)
+
+      if spnego
+        # TODO: KERB we need to iterate until complete. For now assume that
+        # negotiation is complete on the first pass.
+
+        # TODO: KERB need error handling: null token, decode failure etc.
+        b64rtoken = response['www-authenticate'][('negotiate '.length)..-1]
+        rtoken = Base64.decode64 b64rtoken
+        token = gss.init_context rtoken
+      end
 
       # Check the peer certs and warn if they're nearing expiration.
       warn_if_near_expiration(*ssl_validator.peer_certs)

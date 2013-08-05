@@ -186,6 +186,10 @@ DOC
   end
 
   def certificate
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      return nil
+    end
+
     unless @certificate
       generate_key unless key
 
@@ -218,6 +222,10 @@ ERROR_STRING
 
   # Generate all necessary parts of our ssl host.
   def generate
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      return
+    end
+
     generate_key unless key
     generate_certificate_request unless certificate_request
 
@@ -309,6 +317,10 @@ ERROR_STRING
 
   # Attempt to retrieve a cert, if we don't already have one.
   def wait_for_cert(time)
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      return
+    end
+
     begin
       return if certificate
       generate
@@ -343,6 +355,10 @@ ERROR_STRING
   end
 
   def state
+    if Puppet[:agent_without_cert] # TODO: KERB HACK
+      return 'signed'
+    end
+
     if certificate_request
       return 'requested'
     end

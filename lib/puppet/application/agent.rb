@@ -479,6 +479,7 @@ Copyright (c) 2011 Puppet Labs, LLC Licensed under the Apache 2.0 License
   def wait_for_certificates
     host = Puppet::SSL::Host.new
     waitforcert = options[:waitforcert] || (Puppet[:onetime] ? 0 : Puppet[:waitforcert])
+    # TODO: KERB host.wait_for_cert will generate a new client cert. Which we don't need/want.
     host.wait_for_cert(waitforcert)
   end
 end
