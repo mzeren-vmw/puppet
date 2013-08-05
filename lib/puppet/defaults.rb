@@ -734,6 +734,30 @@ EOT
     },
   )
 
+  # TODO: KERB remove these in favor of using /etc/apache2/httpd.keytab directly, or even better
+  # create a separate service that owns the credentials and caches the results of this lookup.
+  define_settings(:master, # :gss?
+    :remote_user_ldap_server => {
+      :type => :string,
+      :default => nil,
+      :desc => "fqdn of the ldap server/domain controller that will be used for REMOTE_USER -> fqdn lookups",
+    },
+    :remote_user_ldap_port => {
+      :default => 389,
+      :desc => "port of the ldap server/domain controller that will be used for REMOTE_USER -> fqdn lookups",
+    },
+    :remote_user_ldap_evil_horrible_hack_username => {
+      :type => :string,
+      :default => nil,
+      :desc => "user"
+    },
+    :remote_user_ldap_evil_horrible_hack_password => {
+      :type => :string,
+      :default => nil,
+      :desc => "password"
+    },
+  )
+
   # Define the config default.
 
     define_settings(:application,

@@ -1,6 +1,7 @@
 require 'openssl'
 require 'puppet/network/http/handler'
 require 'puppet/network/http/rack/httphandler'
+require 'puppet/network/http/rack/ldap'
 require 'puppet/util/ssl'
 
 class Puppet::Network::HTTP::RackREST < Puppet::Network::HTTP::RackHttpHandler
@@ -31,6 +32,7 @@ class Puppet::Network::HTTP::RackREST < Puppet::Network::HTTP::RackHttpHandler
   def initialize(args={})
     super()
     initialize_for_puppet(args)
+    @rulookup = Puppet::Network::HTTP::RackLDAP.new
   end
 
   def set_content_type(response, format)
@@ -113,10 +115,18 @@ class Puppet::Network::HTTP::RackREST < Puppet::Network::HTTP::RackHttpHandler
     # Apache with StdEnvVars.
     subj_str = request.env[Puppet[:ssl_client_header]]
     subject = Puppet::Util::SSL.subject_from_dn(subj_str || "")
+    ssl_cn = Puppet::Util::SSL.cn_from_subject(subject)
+    ssl_verified = request.env[Puppet[:ssl_client_verify_header]] == 'SUCCESS'
 
-    if cn = Puppet::Util::SSL.cn_from_subject(subject)
-      result[:node] = cn
-      result[:authenticated] = (request.env[Puppet[:ssl_client_verify_header]] == 'SUCCESS')
+    remote_user = request.env["REMOTE_USER"]
+    remote_node = @rulookup.lookupHostname(remote_user) if remote_user and @rulookup
+
+    if ssl_cn && ssl_verified
+      result[:node] = ssl_cn
+      result[:authenticated] = true
+    elsif remote_node
+      result[:node] = remote_node
+      result[:authenticated] = true
     else
       result[:node] = resolve_node(result)
       result[:authenticated] = false
